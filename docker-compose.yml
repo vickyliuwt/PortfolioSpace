@@ -1,0 +1,239 @@
+# full stack in docker (optional, one command runs EVERYTHING).
+# beginners: prefer infra/docker-compose.yml + npm. use this once you are comfy.
+#
+#   docker compose up --build
+#
+# then open http://localhost:3000   (demo login: vicky / paw12345)
+# every service waits for its dependencies to be HEALTHY before starting.
+
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    ports: ["27017:27017"]
+    volumes: ["mongo_data:/data/db"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    volumes: ["redis_data:/data"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio_data:/data"]
+
+  # one-shot: make bucket + allow public reads (loops until minio is up)
+  minio-setup:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: >
+      /bin/sh -c "
+      until (mc alias set local http://minio:9000 minioadmin minioadmin) do sleep 2; done;
+      mc mb --ignore-existing local/portfoliospace;
+      mc anonymous set download local/portfoliospace;
+      exit 0;
+      "
+
+  auth-service:
+    build: { context: ./server }
+    image: portfoliospace-server:latest
+    working_dir: /app/services/auth-service
+    command: ["npm", "start"]
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 4001
+      MONGO_URL: mongodb://mongo:27017/portfoliospace
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: paw_dev_secret_change_me
+      CLIENT_URL: http://localhost:3000
+    ports: ["4001:4001"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4001/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  portfolio-service:
+    build: { context: ./server }
+    image: portfoliospace-server:latest
+    working_dir: /app/services/portfolio-service
+    command: ["npm", "start"]
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 4002
+      MONGO_URL: mongodb://mongo:27017/portfoliospace
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: paw_dev_secret_change_me
+      CLIENT_URL: http://localhost:3000
+      # 0 or unset means no cap
+      BASIC_PROJECT_LIMIT: 0
+      SEED_ON_START: "true"
+    ports: ["4002:4002"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  media-service:
+    build: { context: ./server }
+    image: portfoliospace-server:latest
+    working_dir: /app/services/media-service
+    command: ["npm", "start"]
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      minio-setup:
+        condition: service_completed_successfully
+    environment:
+      PORT: 4003
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: paw_dev_secret_change_me
+      CLIENT_URL: http://localhost:3000
+      STORAGE_DRIVER: minio
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_ENDPOINT: http://localhost:9000
+      MINIO_BUCKET: portfoliospace
+      MINIO_REGION: us-east-1
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports: ["4003:4003"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4003/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  search-service:
+    build: { context: ./server }
+    image: portfoliospace-server:latest
+    working_dir: /app/services/search-service
+    command: ["npm", "start"]
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 4004
+      MONGO_URL: mongodb://mongo:27017/portfoliospace
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: paw_dev_secret_change_me
+      CLIENT_URL: http://localhost:3000
+      # no elasticsearch container here, so search answers from mongo
+      ES_URL: http://elasticsearch:9200
+    ports: ["4004:4004"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4004/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  moderation-service:
+    build: { context: ./server }
+    image: portfoliospace-server:latest
+    working_dir: /app/services/moderation-service
+    command: ["npm", "start"]
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      PORT: 4005
+      MONGO_URL: mongodb://mongo:27017/portfoliospace
+      REDIS_URL: redis://redis:6379
+      SESSION_SECRET: paw_dev_secret_change_me
+      CLIENT_URL: http://localhost:3000
+    ports: ["4005:4005"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4005/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  gateway:
+    build: { context: ./server }
+    image: portfoliospace-server:latest
+    working_dir: /app/gateway
+    command: ["npm", "start"]
+    restart: unless-stopped
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      portfolio-service:
+        condition: service_healthy
+      media-service:
+        condition: service_healthy
+      search-service:
+        condition: service_healthy
+      moderation-service:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      AUTH_URL: http://auth-service:4001
+      PORTFOLIO_URL: http://portfolio-service:4002
+      MEDIA_URL: http://media-service:4003
+      SEARCH_URL: http://search-service:4004
+      MODERATION_URL: http://moderation-service:4005
+      CLIENT_URL: http://localhost:3000
+    ports: ["4000:4000"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  client:
+    build: { context: ./client }
+    restart: unless-stopped
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+    ports: ["3000:3000"]
+
+volumes:
+  mongo_data:
+  minio_data:
+  redis_data:

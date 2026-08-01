@@ -1,0 +1,26 @@
+{
+  "name": "portfoliospace",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PortfolioSpace - a creative portfolio web app (React, Node, MongoDB, S3/MinIO, microservices)",
+  "scripts": {
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently -n server,client -c magenta,cyan \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "start": "concurrently -n server,client -c magenta,cyan \"npm --prefix server start\" \"npm --prefix client start\"",
+    "infra:up": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:up:search": "docker compose -f infra/docker-compose.yml --profile search up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml --profile search down",
+    "infra:reset": "docker compose -f infra/docker-compose.yml --profile search down -v",
+    "seed": "npm --prefix server run seed",
+    "test": "npm --prefix server test && npm --prefix client test",
+    "docker:up": "docker compose up --build",
+    "docker:down": "docker compose down",
+    "test:reset-mongo": "node server/scripts/clean-mongo-cache.mjs"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

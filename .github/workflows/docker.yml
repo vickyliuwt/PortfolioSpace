@@ -1,0 +1,55 @@
+# builds the container images
+# runs after ci passes on main
+
+name: Docker
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  images:
+    name: Build ${{ matrix.name }} image
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gateway
+            context: server
+            service: gateway
+          - name: auth
+            context: server
+            service: services/auth-service
+          - name: portfolio
+            context: server
+            service: services/portfolio-service
+          - name: media
+            context: server
+            service: services/media-service
+          - name: search
+            context: server
+            service: services/search-service
+          - name: moderation
+            context: server
+            service: services/moderation-service
+          - name: client
+            context: client
+            service: ""
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.context }}/Dockerfile
+          push: false
+          load: true
+          tags: portfoliospace-${{ matrix.name }}:ci
+          build-args: |
+            SERVICE=${{ matrix.service }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

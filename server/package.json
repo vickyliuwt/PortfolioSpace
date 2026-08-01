@@ -1,0 +1,41 @@
+{
+  "name": "portfoliospace-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PortfolioSpace backend - gateway + microservices",
+  "workspaces": [
+    "shared",
+    "gateway",
+    "services/auth-service",
+    "services/portfolio-service",
+    "services/media-service",
+    "services/search-service",
+    "services/moderation-service"
+  ],
+  "scripts": {
+    "dev": "concurrently -n auth,portfolio,media,search,moderation,gateway -c magenta,cyan,yellow,blue,red,green \"npm:dev:auth\" \"npm:dev:portfolio\" \"npm:dev:media\" \"npm:dev:search\" \"npm:dev:moderation\" \"npm:dev:gateway\"",
+    "dev:auth": "npm run dev -w services/auth-service",
+    "dev:portfolio": "npm run dev -w services/portfolio-service",
+    "dev:media": "npm run dev -w services/media-service",
+    "dev:search": "npm run dev -w services/search-service",
+    "dev:gateway": "npm run dev -w gateway",
+    "start": "concurrently -n auth,portfolio,media,search,moderation,gateway -c magenta,cyan,yellow,blue,red,green \"npm:start:auth\" \"npm:start:portfolio\" \"npm:start:media\" \"npm:start:search\" \"npm:start:moderation\" \"npm:start:gateway\"",
+    "start:auth": "npm start -w services/auth-service",
+    "start:portfolio": "npm start -w services/portfolio-service",
+    "start:media": "npm start -w services/media-service",
+    "start:search": "npm start -w services/search-service",
+    "start:gateway": "npm start -w gateway",
+    "seed": "npm run seed -w services/portfolio-service",
+    "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "dev:moderation": "npm run dev -w services/moderation-service",
+    "start:moderation": "npm start -w services/moderation-service"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

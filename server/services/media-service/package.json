@@ -1,0 +1,39 @@
+{
+  "name": "ps-media-service",
+  "version": "1.0.0",
+  "description": "PortfolioSpace media microservice (S3/MinIO uploads + presigned URLs)",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "node ../../scripts/run-jest.mjs --runInBand",
+    "test:coverage": "node ../../scripts/run-jest.mjs --runInBand --coverage"
+  },
+  "author": "Weiting Liu",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.720.0",
+    "@aws-sdk/s3-request-presigner": "^3.720.0",
+    "connect-redis": "^9.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "helmet": "^8.1.0",
+    "mime-types": "^3.0.1",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "redis": "^5.9.1",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "private": true
+}
